@@ -1,0 +1,226 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "../contracts/token/ERC20/IERC20.sol";
+import "../contracts/utils/ReentrancyGuard.sol";
+import "../contracts/access/Ownable.sol";
+
+/**
+ * @title 质押合约
+ * @dev 允许用户质押代币并根据质押时间获得奖励
+ */
+contract StakingContract is ReentrancyGuard, Ownable {
+    // 质押代币
+    IERC20 public stakingToken;
+    // 奖励代币
+    IERC20 public rewardToken;
+    
+    // 每秒发放的奖励代币数量
+    uint256 public rewardRate;
+    // 上次更新奖励的时间戳
+    uint256 public lastUpdateTime;
+    // 每单位质押的累计奖励
+    uint256 public rewardPerTokenStored;
+    // 质押结束时间
+    uint256 public periodFinish;
+    // 奖励持续时间
+    uint256 public rewardsDuration = 7 days;
+    // 总质押量
+    uint256 public totalStaked;
+
+    // 用户地址 => 用户已领取的奖励
+    mapping(address => uint256) public userRewardPerTokenPaid;
+    // 用户地址 => 用户未领取的奖励
+    mapping(address => uint256) public rewards;
+    // 用户地址 => 用户质押的代币数量
+    mapping(address => uint256) public balances;
+    // 用户地址 => 用户质押的时间
+    mapping(address => uint256) public stakingTime;
+    // 最短质押时间（锁定期）
+    uint256 public lockPeriod = 1 days;
+
+    // 事件
+    event Staked(address indexed user, uint256 amount);
+    event Withdrawn(address indexed user, uint256 amount);
+    event RewardPaid(address indexed user, uint256 reward);
+    event RewardAdded(uint256 reward);
+
+    /**
+     * @dev 构造函数
+     * @param _stakingToken 质押代币地址
+     * @param _rewardToken 奖励代币地址
+     */
+    constructor(address _stakingToken, address _rewardToken) Ownable(msg.sender) {
+        stakingToken = IERC20(_stakingToken);
+        rewardToken = IERC20(_rewardToken);
+    }
+
+    /**
+     * @dev 更新奖励变量
+     * @param _account 用户地址
+     */
+    modifier updateReward(address _account) {
+        rewardPerTokenStored = rewardPerToken();
+        lastUpdateTime = lastTimeRewardApplicable();
+        
+        if (_account != address(0)) {
+            rewards[_account] = earned(_account);
+            userRewardPerTokenPaid[_account] = rewardPerTokenStored;
+        }
+        _;
+    }
+
+    /**
+     * @dev 获取最后一次可应用奖励的时间
+     * @return uint256 时间戳
+     */
+    function lastTimeRewardApplicable() public view returns (uint256) {
+        return block.timestamp < periodFinish ? block.timestamp : periodFinish;
+    }
+
+    /**
+     * @dev 计算每个代币的奖励
+     * @return uint256 每个代币的奖励
+     */
+    function rewardPerToken() public view returns (uint256) {
+        if (totalStaked == 0) {
+            return rewardPerTokenStored;
+        }
+        return rewardPerTokenStored + 
+            (lastTimeRewardApplicable() - lastUpdateTime) * 
+            rewardRate * 
+            1e18 / 
+            totalStaked;
+    }
+
+    /**
+     * @dev 计算用户已赚取但未领取的奖励
+     * @param _account 用户地址
+     * @return uint256 用户已赚取的奖励
+     */
+    function earned(address _account) public view returns (uint256) {
+        return balances[_account] * 
+            (rewardPerToken() - userRewardPerTokenPaid[_account]) / 
+            1e18 + 
+            rewards[_account];
+    }
+
+    /**
+     * @dev 质押代币
+     * @param _amount 质押数量
+     */
+    function stake(uint256 _amount) external nonReentrant updateReward(msg.sender) {
+        require(_amount > 0, "Cannot stake 0");
+        
+        totalStaked += _amount;
+        balances[msg.sender] += _amount;
+        stakingTime[msg.sender] = block.timestamp;
+        
+        // 转移代币到合约
+        bool success = stakingToken.transferFrom(msg.sender, address(this), _amount);
+        require(success, "Token transfer failed");
+        
+        emit Staked(msg.sender, _amount);
+    }
+
+    /**
+     * @dev 提取质押的代币
+     * @param _amount 提取数量
+     */
+    function withdraw(uint256 _amount) external nonReentrant updateReward(msg.sender) {
+        require(_amount > 0, "Cannot withdraw 0");
+        require(balances[msg.sender] >= _amount, "Insufficient staked amount");
+        require(block.timestamp >= stakingTime[msg.sender] + lockPeriod, "Still in lock period");
+        
+        totalStaked -= _amount;
+        balances[msg.sender] -= _amount;
+        
+        // 转移代币回用户
+        bool success = stakingToken.transfer(msg.sender, _amount);
+        require(success, "Token transfer failed");
+        
+        emit Withdrawn(msg.sender, _amount);
+    }
+
+    /**
+     * @dev 领取奖励
+     */
+    function getReward() external nonReentrant updateReward(msg.sender) {
+        uint256 reward = rewards[msg.sender];
+        if (reward > 0) {
+            rewards[msg.sender] = 0;
+            
+            // 转移奖励代币给用户
+            bool success = rewardToken.transfer(msg.sender, reward);
+            require(success, "Token transfer failed");
+            
+            emit RewardPaid(msg.sender, reward);
+        }
+    }
+
+    /**
+     * @dev 退出质押（提取全部质押代币并领取奖励）
+     */
+    function exit() external {
+        withdraw(balances[msg.sender]);
+        getReward();
+    }
+
+    /**
+     * @dev 添加奖励（只有合约拥有者可以调用）
+     * @param _amount 奖励数量
+     */
+    function addReward(uint256 _amount) external onlyOwner updateReward(address(0)) {
+        // 转移奖励代币到合约
+        bool success = rewardToken.transferFrom(msg.sender, address(this), _amount);
+        require(success, "Token transfer failed");
+        
+        if (block.timestamp >= periodFinish) {
+            rewardRate = _amount / rewardsDuration;
+        } else {
+            uint256 remaining = periodFinish - block.timestamp;
+            uint256 leftover = remaining * rewardRate;
+            rewardRate = (_amount + leftover) / rewardsDuration;
+        }
+        
+        lastUpdateTime = block.timestamp;
+        periodFinish = block.timestamp + rewardsDuration;
+        
+        emit RewardAdded(_amount);
+    }
+
+    /**
+     * @dev 设置奖励持续时间（只有合约拥有者可以调用）
+     * @param _rewardsDuration 新的奖励持续时间
+     */
+    function setRewardsDuration(uint256 _rewardsDuration) external onlyOwner {
+        require(block.timestamp > periodFinish, "Previous rewards period must be complete");
+        rewardsDuration = _rewardsDuration;
+    }
+
+    /**
+     * @dev 设置锁定期（只有合约拥有者可以调用）
+     * @param _lockPeriod 新的锁定期（秒）
+     */
+    function setLockPeriod(uint256 _lockPeriod) external onlyOwner {
+        lockPeriod = _lockPeriod;
+    }
+
+    /**
+     * @dev 紧急情况下，合约拥有者可以取回意外发送到合约的代币
+     * @param _tokenAddress 代币地址
+     * @param _amount 数量
+     */
+    function recoverERC20(address _tokenAddress, uint256 _amount) external onlyOwner {
+        require(_tokenAddress != address(stakingToken), "Cannot withdraw staking token");
+        
+        // 如果是奖励代币，确保不会取走用户的奖励
+        if (_tokenAddress == address(rewardToken)) {
+            uint256 rewardBalance = rewardToken.balanceOf(address(this));
+            uint256 totalRewards = rewardRate * (periodFinish - block.timestamp);
+            require(_amount <= rewardBalance - totalRewards, "Cannot withdraw reserved rewards");
+        }
+        
+        IERC20(_tokenAddress).transfer(owner(), _amount);
+    }
+}

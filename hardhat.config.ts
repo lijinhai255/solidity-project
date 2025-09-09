@@ -7,6 +7,11 @@ import fs from "fs";
 import { subtask } from "hardhat/config";
 import { TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS } from "hardhat/builtin-tasks/task-names";
 import { task } from "hardhat/config";
+import * as dotenv from "dotenv"; // 添加 dotenv 导入
+
+// 加载 .env 文件
+dotenv.config();
+
 
 // 添加子任务来过滤 .t.sol 文件
 subtask(TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS)
@@ -54,7 +59,7 @@ const config: HardhatUserConfig = {
     },
     sepolia: {
       url: 'https://sepolia.infura.io/v3/39b58b9526fd49129246cda88be59a96',
-      accounts: process.env.SEPOLIA_PRIVATE_KEY ? [process.env.SEPOLIA_PRIVATE_KEY] : [],
+       accounts: process.env.SEPOLIA_PRIVATE_KEY ? [process.env.SEPOLIA_PRIVATE_KEY] : [],
     },
   },
   namedAccounts: {

@@ -1,5 +1,5 @@
 {
-  "name": "hardHat-Learing",
+  "name": "hardhat-learing",
   "version": "1.0.0",
   "type": "module",
   "devDependencies": {
@@ -12,6 +12,7 @@
     "@types/mocha": "^10.0.10",
     "@types/node": "^22.18.0",
     "chai": "^5.3.3",
+    "dotenv": "^17.2.2",
     "ethereum-waffle": "^4.0.10",
     "ethers": "^5.7.2",
     "forge-std": "github:foundry-rs/forge-std#v1.9.4",
@@ -24,5 +25,16 @@
     "@chainlink/contracts": "^1.4.0",
     "@openzeppelin/contracts": "^5.4.0",
     "@openzeppelin/contracts-upgradeable": "^5.4.0"
-  }
+  },
+  "description": "This project showcases a Hardhat 3 Beta project using `mocha` for tests and the `ethers` library for Ethereum interactions.",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "mocha"
+  },
+  "keywords": [],
+  "author": "lijinhai255 <976041476@qq.com>",
+  "license": "MIT"
 }
