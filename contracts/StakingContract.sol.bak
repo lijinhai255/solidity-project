@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "../contracts/token/ERC20/IERC20.sol";
-import "../contracts/utils/ReentrancyGuard.sol";
-import "../contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title 质押合约
@@ -127,7 +127,7 @@ contract StakingContract is ReentrancyGuard, Ownable {
      * @dev 提取质押的代币
      * @param _amount 提取数量
      */
-    function withdraw(uint256 _amount) external nonReentrant updateReward(msg.sender) {
+    function withdraw(uint256 _amount) public nonReentrant updateReward(msg.sender) {
         require(_amount > 0, "Cannot withdraw 0");
         require(balances[msg.sender] >= _amount, "Insufficient staked amount");
         require(block.timestamp >= stakingTime[msg.sender] + lockPeriod, "Still in lock period");
@@ -145,7 +145,7 @@ contract StakingContract is ReentrancyGuard, Ownable {
     /**
      * @dev 领取奖励
      */
-    function getReward() external nonReentrant updateReward(msg.sender) {
+    function getReward() public nonReentrant updateReward(msg.sender) {
         uint256 reward = rewards[msg.sender];
         if (reward > 0) {
             rewards[msg.sender] = 0;
