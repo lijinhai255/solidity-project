@@ -8,6 +8,7 @@
     "@nomiclabs/hardhat-etherscan": "^3.1.8",
     "@nomiclabs/hardhat-waffle": "^2.0.6",
     "@openzeppelin/hardhat-upgrades": "^1.28.0",
+    "@typechain/hardhat": "^9.1.0",
     "@types/chai": "^4.3.20",
     "@types/chai-as-promised": "^8.0.2",
     "@types/mocha": "^10.0.10",
@@ -18,8 +19,11 @@
     "ethers": "^5.7.2",
     "forge-std": "github:foundry-rs/forge-std#v1.9.4",
     "hardhat": "^2.19.5",
+    "hardhat-contract-sizer": "^2.10.1",
     "hardhat-deploy": "^1.0.4",
+    "hardhat-gas-reporter": "^2.3.0",
     "mocha": "^11.7.2",
+    "solidity-coverage": "^0.8.16",
     "typescript": "~5.8.0"
   },
   "dependencies": {

@@ -8,7 +8,7 @@ async function main() {
   console.log("使用账户:", await sender.getAddress());
 
   // 接收地址
-  const recipientAddress = "0x3ad7e0Af623684656C873ae4907bc6C4AcC2c336";
+  const recipientAddress = "0xc8Ea90b2f341b3D6955641eECAee83750312903C";
   console.log("接收地址:", recipientAddress);
 
   // 代币合约地址和名称
